@@ -4,6 +4,7 @@
 #include <QDateTime>
 #include <string>
 #include "message_types.h"
+#include <QDataStream>
 
 #include <QDebug>
 MainWindow::MainWindow(QWidget *parent)
@@ -39,7 +40,10 @@ void MainWindow::onTabChanged(int index)
     qDebug() <<index<< "Tab changed to:" << inputText.length();
     if(index==1 && inputText.length()==0){
         socket->write("LIST:");
+
     }
+
+    // socket->write("FILE:D:\\Code\\Visual_Studio\\Mike_C2\\Mike_C2\\x64\\Debug\\6666.jpg");
 }
 
 
@@ -79,128 +83,109 @@ void MainWindow::InitializationLayout()
 
 }
 
-
-
 void MainWindow::onConnectButtonClicked() {
-      qDebug() << "Attempting to connect to server...";
-    socket->connectToHost("192.168.52.132", 8080);
-    if (socket->waitForConnected(3000)) {
+    qDebug() << "Attempting to connect to server...??";
+    // socket->connectToHost("192.168.52.132",8080);
+    socket->connectToHost("192.168.52.132",9363);
+
+    if (socket->waitForConnected(30000)) {
         QMessageBox::information(this, "Connection", "Connected to server");
-             socket->write("CLIENT");
+        socket->write("CLIENT");
     } else {
-        QMessageBox::warning(this, "Connection", "Failed to connect to server");
+        QMessageBox::warning(this, "Connection", "Failed to connect to server1");
     }
 
 }
 
 void MainWindow::onSendButtonClicked() {
-   QString inputText = ui->lineEdit_3->text(); // 获取QLineEdit的文本并保存到变量中
+    QString inputText = ui->lineEdit_3->text(); // 获取QLineEdit的文本并保存到变量中
 
 
-   qDebug() << "Input text: " << inputText; // 打印输入的文本（可选，需要#include <QDebug>）
+    qDebug() << "Input text: " << inputText; // 打印输入的文本（可选，需要#include <QDebug>）
     logMessage(true,inputText);
     if (socket->state() == QTcpSocket::ConnectedState) {
         socket->write(inputText.toUtf8());
     } else {
         QMessageBox::warning(this, "Connection", "Not connected to server");
     }
-     ui->lineEdit_3->clear(); // 清空QLineEdit的内容
+    ui->lineEdit_3->clear(); // 清空QLineEdit的内容
 }
 
-// void MainWindow::processChunks(const QByteArray& data) {
-//     int totalSize = data.size();
-//     const char* ptr = data.constData();
+void MainWindow::processChunks(const QByteArray& data) {
+    int totalSize = data.size();
+    const char* ptr = data.constData();
+    qDebug() << "processChunks IN! ";
 
-//     while (totalSize > 0) {
-//         std::vector<char> chunk_data(ptr, ptr + sizeof(Message));
-//         Message msg = Message::deserialize(chunk_data);
+    while (totalSize > 0) {
+        std::vector<char> chunk_data(ptr, ptr + sizeof(Message));
+                qDebug() << "deserialize IN ";
+        Message msg = Message::deserialize(chunk_data);
+            qDebug() << "deserialize IN! ";
+        if(msg.type == MessageType::Binary){
+            if (msg.type == MessageType::END) {
+                qDebug() << "Translation Done! ";
+                // saveToFile();
+                break;
+            }
 
-//         if (msg.type == MessageType::END) {
-//             saveToFile();
-//             break;
-//         }
+            if (msg.validateChecksum()) {
+                receivedChunks[msg.chunk_id] = msg.data;
+            } else {
+                qCritical() << "Checksum validation failed for chunk" << msg.chunk_id;
+            }
 
-//         if (msg.validateChecksum()) {
-//             receivedChunks[msg.chunk_id] = msg.data;
-//         } else {
-//             qCritical() << "Checksum validation failed for chunk" << msg.chunk_id;
-//         }
+            ptr += sizeof(Message);
+            totalSize -= sizeof(Message);
+        }
+    }
+}
 
-//         ptr += sizeof(Message);
-//         totalSize -= sizeof(Message);
-//     }
-// }
-
-void MainWindow::onReadyRead() {
-    // qDebug() << "Raw data in hex:" << data.toHex();
-    QByteArray bytes = socket->readAll();
-
-    // QTcpSocket *clientConnection = qobject_cast<QTcpSocket *>(sender());
-    // if (clientConnection) {
-    //     file->write(clientConnection->readAll());
+void MainWindow::saveToFile() {
+    QFile file(filename);
+    if (!file.open(QIODevice::WriteOnly)) {
+        qCritical() << "Cannot open file for writing:" << file.errorString();
+        return;
+    }
+    // qDebug()<<receivedChunks.empty();
+    // for (const auto& pair : receivedChunks) {
+    //     file.write(pair.second.data(), pair.second.size());
     // }
+    qDebug()<<"buffer size:"<<buffer.size();
+    file.write(buffer);
 
-    // // 确保读取完整的消息头
-    // if (socket->bytesAvailable() < static_cast<int>(sizeof(uint32_t) + sizeof(uint64_t))) {
-    //     return; // 消息头不完整，等待更多数据
-    // }
+    file.close();
 
-    // // 处理消息头
-    // uint32_t type;
-    // uint64_t length;
+    qDebug() << "File saved successfully";
+}
 
-    // QDataStream socketStream(socket);
-    // socketStream.setByteOrder(QDataStream::BigEndian); // 设置字节序为网络字节序
-
-    // socketStream >> type >> length;
-
-    // 假设您已经收集了足够的字节来构造一个完整的Message对象
-    std::vector<char> data(bytes.begin(), bytes.end());
-    Message msg = Message::deserialize(data);
-    qDebug() << "data size:." << msg.length;
-    MessageType messageType = static_cast<MessageType>(msg.type);
-
+void MainWindow::switchType(MessageType messageType) {
     switch (messageType) {
     case MessageType::Command: {
         // 处理文本消息
-        qDebug() << "Command data:" << msg.data;
+        qDebug() << "Command data:" ;
         qDebug() << "Command length:" << msg.length;
         std::string text(msg.data.begin(), msg.data.end());
-        QString qstr = QString::fromStdString(text);
-
-        logMessage(false, qstr);
-        break;
-    }
-    case MessageType::Binary: {
-        qDebug() << "Binary data:" << msg.data.size();
-
-        if(!file.isOpen()) {
-            file.setFileName(this->filename); // 注意：文件扩展名应为 .txt 而不是 .text
-            if(file.open(QIODevice::WriteOnly)) {
-                // 获取指向数据的指针并写入文件
-                file.write(msg.data.data(), msg.data.size());
-                file.flush(); // 确保数据写到磁盘
-
-                file.close();
-            } else {
-                // 文件打开失败的处理逻辑
-                qDebug() << "Unable to open file for writing.";
-            }
-        }
-
-        // 这里可以将bytes保存到文件等
-        break;
-    }
-    case MessageType::Text: {
-
-        qDebug() << "Text data:" << msg.data;
-        std::string text(msg.data.begin(), msg.data.end());
-
         QString utf8_str=QString::fromLocal8Bit(text);
         logMessage(false, utf8_str);
         break;
     }
+    case MessageType::Binary: {
+        qDebug() << "Binary data:" << msg.length ;   //<<" ChunkID: "<<msg.chunk_id;
+        receivedChunks[msg.chunk_id] = msg.data;
+
+        break;
+    }
+    case MessageType::Text: {
+
+        qDebug() << "Text data:" ;
+        // std::string text(msg.data.begin(), msg.data.end());
+
+        // QString utf8_str=QString::fromLocal8Bit(text);
+        // logMessage(false, utf8_str);
+        break;
+    }
     case MessageType::FileList: {
+        qDebug() << "FileList:" ;
         std::string text(msg.data.begin(), msg.data.end());
         QString utf8_str=QString::fromLocal8Bit(text);
         logMessage(false, utf8_str);
@@ -225,11 +210,51 @@ void MainWindow::onReadyRead() {
         ui->tableView->setModel(model);
         break;
     }
+    case MessageType::FIleSize: {
+        buffer.clear();
+        qDebug() << "FIleSize:" <<msg.filesize;
+        msg_length=msg.filesize;
+        isFile=true;
+        break;
+    }
+    case MessageType::END: {
+        qDebug() << "Transfer File Done !" ;
+        saveToFile();
+        break;
+    }
     default:
         qDebug() << "Unknown message type received.";
         break;
     }
+}
 
+void MainWindow::onReadyRead() {
+    // QDataStream stream(socket);
+    // stream.setByteOrder(QDataStream::LittleEndian);  // 确保字节顺序与发送端一致
+
+    // qDebug()<<isFile;
+    while (socket->bytesAvailable() > 0) {
+        // 如果正在读取新的数据包
+        qDebug()<<"接受到数据"<<socket->bytesAvailable();
+    if(isFile){
+        buffer.append(socket->readAll());
+        qDebug()<<buffer.size()<<" | msg_length: "<<msg_length<<" filesize |bytesAvailable: "<<socket->bytesAvailable();
+        if(buffer.size()>=msg_length)
+        {
+            saveToFile();
+            isFile=false;
+            return;//return后，剩余的报文内容会接着触发
+        }
+    }else{
+        QByteArray bytes=socket->readAll();
+        // qDebug()<<bytes.size()<<" | quint32: "<<sizeof(quint32);
+        std::vector<char> data(bytes.begin(), bytes.end());
+        msg = Message::deserialize(data);
+        // qDebug() << "data size:." << msg.length;
+        MessageType messageType = static_cast<MessageType>(msg.type);
+        switchType(messageType);
+    }
+    }
 }
 
 void MainWindow::onDirectoryClicked(const QModelIndex &index) {
@@ -294,12 +319,40 @@ void MainWindow::provideContextMenu(const QPoint &position) {
 }
 
 void MainWindow::uploadFile() {
+    QString inputText = ui->lineEdit_4->text();
     // 使用 QFileDialog 弹出文件选择对话框
     QString filePath = QFileDialog::getOpenFileName(this, tr("Select File to Upload"),
                                                     QDir::homePath(), tr("All Files (*)"));
+    QFileInfo fileInfo(filePath);
+
     // 检查用户是否选择了文件
     if (!filePath.isEmpty()) {
-        qDebug() << "上传文件路径: " << filePath;
+        QFile file(filePath);
+        if (!file.open(QIODevice::ReadOnly)) {
+            qDebug() << "Could not open file";
+            return;
+        }
+        qint64 fileSize = file.size();
+        QString send_fileName = "isFile"+inputText+"\\"+fileInfo.fileName()+"|"+QString::number(fileSize);
+
+        qDebug() << "上传文件路径: " << filePath<<"  | "<<send_fileName;
+        socket->write(send_fileName.toUtf8());
+        socket->flush();
+        QThread::sleep(1);
+
+        while (!file.atEnd()) {
+            QByteArray buffer = file.read(1024*64);  // 将文件数据读取到buffer中，每次读取1024字节
+            socket->write(buffer);  // 将buffer中的数据发送出去
+            qDebug() << "send buffer size: "<<buffer.size();
+            socket->waitForBytesWritten();  // 等待数据发送完成
+            socket->flush();
+        }
+        QThread::sleep(1);
+        socket->write("Transfer_File_end");
+        socket->flush();
+        qDebug() << "文件传输完毕！ ";
+        file.close();  // 关闭文件
+
         // 在此处添加上传或处理文件的代码
     }
 }
@@ -311,11 +364,10 @@ void MainWindow::downloadFile(const QModelIndex &index) {
     if(index.siblingAtColumn(0).data()=="file"){
         QString inputText = ui->lineEdit_4->text();
         QDir dir(inputText);
-        this->filename=index.siblingAtColumn(1).data().toString().trimmed();
+        filename=index.siblingAtColumn(1).data().toString().trimmed();
         // 使用filePath()拼接路径和字符串
         QString newPath = dir.filePath(index.siblingAtColumn(1).data().toString().trimmed());
-
-        qDebug() << "New path:" << newPath;
+        // qDebug() << "New path:" << newPath;
         socket->write("FILE:"+newPath.toUtf8());
 
     }

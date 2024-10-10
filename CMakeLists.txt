@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(Client_new VERSION 0.1 LANGUAGES CXX)
+project(Client_two VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
@@ -12,8 +12,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Network)
 
-
-
 set(PROJECT_SOURCES
         main.cpp
         mainwindow.cpp
@@ -22,50 +20,46 @@ set(PROJECT_SOURCES
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
-    qt_add_executable(Client_new
+    qt_add_executable(Client_two
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
-        LineEditDelegate.h
-        Message_types.h
+        LineEditDelegate.h Message_types.h
         vcpkg.json
     )
 # Define target properties for Android with Qt 6 as:
-#    set_property(TARGET Client_new APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
+#    set_property(TARGET Client_two APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
 #                 ${CMAKE_CURRENT_SOURCE_DIR}/android)
 # For more information, see https://doc.qt.io/qt-6/qt-add-executable.html#target-creation
 else()
     if(ANDROID)
-        add_library(Client_new SHARED
+        add_library(Client_two SHARED
             ${PROJECT_SOURCES}
         )
 # Define properties for Android with Qt 5 after find_package() calls as:
 #    set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android")
     else()
-        add_executable(Client_new
+        add_executable(Client_two
             ${PROJECT_SOURCES}
         )
     endif()
 endif()
 
-# find_package(fmt CONFIG REQUIRED)
-#  target_link_libraries(Client_new PRIVATE fmt::fmt)
+find_package(fmt CONFIG REQUIRED)
+target_link_libraries(Client_two PRIVATE fmt::fmt)
 
-#  # Or use the header-only version
-#  find_package(fmt CONFIG REQUIRED)
-#  target_link_libraries(Client_new PRIVATE fmt::fmt-header-only)
+find_package(OpenSSL REQUIRED)
+target_link_libraries(Client_two PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 
-# find_package(OpenSSL REQUIRED)
-# target_link_libraries(main PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 
-target_link_libraries(Client_new PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Network)
+target_link_libraries(Client_two PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Network)
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an
 # explicit, fixed bundle identifier manually though.
 if(${QT_VERSION} VERSION_LESS 6.1.0)
-  set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.Client_new)
+  set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.Client_two)
 endif()
-set_target_properties(Client_new PROPERTIES
+set_target_properties(Client_two PROPERTIES
     ${BUNDLE_ID_OPTION}
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
@@ -74,12 +68,12 @@ set_target_properties(Client_new PROPERTIES
 )
 
 include(GNUInstallDirs)
-install(TARGETS Client_new
+install(TARGETS Client_two
     BUNDLE DESTINATION .
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
 if(QT_VERSION_MAJOR EQUAL 6)
-    qt_finalize_executable(Client_new)
+    qt_finalize_executable(Client_two)
 endif()

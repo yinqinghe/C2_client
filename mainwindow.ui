@@ -147,6 +147,13 @@
          <widget class="QLineEdit" name="lineEdit_4"/>
         </item>
         <item>
+         <widget class="QPushButton" name="pushButton_2">
+          <property name="text">
+           <string>List Driver</string>
+          </property>
+         </widget>
+        </item>
+        <item>
          <widget class="QToolButton" name="toolButton">
           <property name="cursor">
            <cursorShape>ArrowCursor</cursorShape>
@@ -174,8 +181,26 @@
      <height>17</height>
     </rect>
    </property>
+   <widget class="QMenu" name="menu1">
+    <property name="title">
+     <string>菜单</string>
+    </property>
+   </widget>
+   <widget class="QMenu" name="menu">
+    <property name="title">
+     <string>功能</string>
+    </property>
+    <addaction name="actionCamera"/>
+   </widget>
+   <addaction name="menu1"/>
+   <addaction name="menu"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionCamera">
+   <property name="text">
+    <string>Camera</string>
+   </property>
+  </action>
  </widget>
  <resources/>
  <connections/>
